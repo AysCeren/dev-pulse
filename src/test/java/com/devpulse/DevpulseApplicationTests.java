@@ -1,4 +1,4 @@
-package com.project.devpulse;
+package com.devpulse;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
