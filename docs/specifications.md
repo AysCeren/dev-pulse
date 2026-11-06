@@ -828,8 +828,8 @@ The running record of where the implementation intentionally differs from this d
 | Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Applied |
 | Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Applied |
 | Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Applied |
-| Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Planned (Phase 2) |
-| Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Planned (Phase 2) |
+| Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Applied |
+| Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Applied |
 | Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Planned (Phase 4) |
 | Triage flow | Saves after the Claude call, in one transaction | Saves `NEW`, dispatches after commit, calls Claude outside any transaction | Avoids holding a connection during the call, and losing events | Planned (Phase 4) |
 | Triage failure | Saves a fabricated `MEDIUM`/`BUG` result as `TRIAGED` | Marks `TRIAGE_FAILED` | Fabricated data looks real | Planned (Phase 4) |
