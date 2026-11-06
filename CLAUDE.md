@@ -4,6 +4,7 @@ Event-driven GitHub issue triage backend. GitHub webhooks are verified, stored, 
 
 - **Spec:** [docs/specifications.md](docs/specifications.md). It targets older versions, so check its "Deviations from Spec" section before copying its code.
 - **Interview notes:** [docs/interview-prep.md](docs/interview-prep.md)
+- **Open questions for the owner:** [docs/discussion-notes.md](docs/discussion-notes.md)
 
 ## Stack
 
@@ -72,14 +73,11 @@ Check every diff for:
 
 This project is mentored, and the owner is preparing for interviews.
 
-1. Claude writes all code except the Docker files, one step at a time, and runs the step's gate.
-2. Claude stops and summarizes what changed, the key decisions, and any deviations from the spec.
-3. The owner reviews, and they discuss it. Claude explains anything asked about.
-4. Claude updates `docs/interview-prep.md`, logs any deviations in the spec, and suggests a commit message.
-5. The owner commits. **Claude never runs `git commit` or `git push`.**
-6. Claude starts the next step only when told to.
-
-Each phase ends with a short mock interview.
+1. Before each step, run `git pull` and confirm the working tree is clean.
+2. Each step gets its own branch, created from the previous step's branch until the owner merges to `main`.
+3. Claude writes the code, runs the step's gate, then commits and pushes that branch. Claude does not merge to `main`.
+4. Claude updates `docs/interview-prep.md`, logs deviations in the spec, and adds anything to discuss to `docs/discussion-notes.md`.
+5. The owner reviews afterwards and asks about anything in the notes or code.
 
 **The owner's files:** `Dockerfile`, `docker-compose.yml`, `.env.example`, all planned for Phase 6. Don't edit these unless asked, and don't make earlier phases depend on them.
 
