@@ -838,10 +838,17 @@ The running record of where the implementation intentionally differs from this d
 | Prompt safety | Issue text sent as plain prompt | Issue text marked as untrusted, and output validated against enums | Anyone can write an issue, so it can contain prompt injection | Applied |
 | Refusals | Not handled | `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta header | A safety classifier decline is retried on another model | Applied |
 | Auth endpoints | Native JWT and BCrypt described, with no endpoints specified | `POST /api/v1/auth/register` and `/login`. 12-72 character passwords, emails stored lowercase, 1-hour tokens | The spec needs these but doesn't define them | Applied |
-| Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Applied |
+| GitHub callback | Reads the caller's JWT from the request | A signed, 15-minute `state` from `GET /api/v1/github/install-url` identifies the user, and the installation is verified with GitHub's API | A browser redirect from GitHub carries no `Authorization` header | Applied |
+| Installation claims | Not specified | Rejects an installation linked to another user (409), and first-time claims older than 1 hour (409) | `installation_id` in the callback URL can be edited by the user | Applied |
+| Callback results | Redirects to "the onboarding view" | Redirects to `github.app.onboarding-url` with `?installation=success`, `cancelled` or `pending` | No frontend exists yet, so the URL is configurable | Applied |
+| Cache eviction | `@CacheEvict` on the orchestrator | Not built, and Redis isn't used yet | Nothing is cached, because no read API exists | Deferred |
+| Webhook security | No filter chain defined for this slice | JWT filter chain. Public: webhook, register, login, callback, `/actuator/health`. Other actuator paths need `ROLE_ADMIN`, other `/api/v1/**` paths need a token, and everything else is denied | The default chain blocks GitHub's `POST`, and the webhook and callback authenticate in other ways | Applied |
 
 ## **Known Gaps**
 
 * Issues left in `NEW` after a crash or full queue are not recovered yet. A recovery job needs locking across instances.
-* The GitHub callback (Issue #4.1) is deferred. A browser redirect carries no JWT, and an unverified `installation_id` could be claimed by another user.
+* An installation can be claimed by a different user within the 1-hour window if they obtain its ID. Closing this fully needs a GitHub user token, which the spec rules out.
+* No read API is defined, so triaged issues can only be read from the database. Caching waits for this.
+* A 429 or 529 from Claude marks an issue `TRIAGE_FAILED` with no retry.
+* The Claude and GitHub integrations have only run against fake servers, not the real APIs.
 * Only the `opened` action is handled, so issue edits and closes are not reflected.

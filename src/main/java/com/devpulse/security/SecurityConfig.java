@@ -31,6 +31,8 @@ public class SecurityConfig {
 				// Webhooks authenticate with their HMAC signature in the controller.
 				.requestMatchers(HttpMethod.POST, "/api/v1/webhooks/github").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+				// A browser redirect from GitHub can't carry a JWT, so the callback authenticates with its signed state.
+				.requestMatchers(HttpMethod.GET, "/api/v1/github/callback").permitAll()
 				.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 				.requestMatchers("/actuator/**").hasAuthority(UserRole.ROLE_ADMIN.name())
 				.requestMatchers("/api/v1/**").authenticated()

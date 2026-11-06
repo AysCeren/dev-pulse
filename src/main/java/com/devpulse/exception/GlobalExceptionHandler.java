@@ -30,6 +30,26 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
 	}
 
+	@ExceptionHandler(InvalidInstallStateException.class)
+	public ProblemDetail handleInvalidInstallState(InvalidInstallStateException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+	}
+
+	@ExceptionHandler(InstallationNotFoundException.class)
+	public ProblemDetail handleInstallationNotFound(InstallationNotFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	@ExceptionHandler({InstallationAlreadyClaimedException.class, InstallationClaimExpiredException.class})
+	public ProblemDetail handleInstallationConflict(RuntimeException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(GitHubApiException.class)
+	public ProblemDetail handleGitHubApi(GitHubApiException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
+	}
+
 	@ExceptionHandler(Exception.class)
 	public ProblemDetail handleUnexpected(Exception ex) {
 		log.error("Unexpected error", ex);

@@ -20,6 +20,7 @@ Boot 4 specifics that differ from the spec's snippets:
 ```bash
 ./gradlew clean :bootJar   # builds exactly one jar in build/libs/
 ./gradlew :test            # needs Docker running (Testcontainers)
+./gradlew clean build      # everything, including plugin/
 ```
 
 ## Local development
@@ -28,7 +29,7 @@ Everything runs directly on the machine during development. Docker images are th
 
 - **Database:** a local PostgreSQL 16 on port 5433, because PostgreSQL 14 already uses 5432.
 - **Redis:** not needed until the caching phase.
-- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. It also needs `ANTHROPIC_API_KEY`, `GITHUB_WEBHOOK_SECRET` and `JWT_SECRET` (at least 32 characters), and fails at startup if any is missing.
+- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. It also needs `ANTHROPIC_API_KEY`, `GITHUB_WEBHOOK_SECRET`, `JWT_SECRET` (at least 32 characters), `GITHUB_APP_ID`, `GITHUB_APP_SLUG` and `GITHUB_APP_PRIVATE_KEY` (PKCS#8 PEM), and fails at startup if one is missing.
 - **Example:** `DB_URL=jdbc:postgresql://localhost:5433/devpulse`
 - **Tests:** from Phase 2 onwards, tests use Testcontainers, so Docker Desktop must be running. No project Docker files are involved, and tests don't touch the local database.
 
