@@ -4,6 +4,7 @@ Event-driven GitHub issue triage backend. GitHub webhooks are verified, stored, 
 
 - **Spec:** [docs/specifications.md](docs/specifications.md). It targets older versions, so check its "Deviations from Spec" section before copying its code.
 - **Interview notes:** [docs/interview-prep.md](docs/interview-prep.md)
+- **Open questions for the owner:** [docs/discussion-notes.md](docs/discussion-notes.md)
 
 ## Stack
 
@@ -18,7 +19,8 @@ Boot 4 specifics that differ from the spec's snippets:
 
 ```bash
 ./gradlew clean :bootJar   # builds exactly one jar in build/libs/
-./gradlew :test            # known failure until Phase 2.1: no test datasource yet
+./gradlew :test            # needs Docker running (Testcontainers)
+./gradlew clean build      # everything, including plugin/
 ```
 
 ## Local development
@@ -27,7 +29,7 @@ Everything runs directly on the machine during development. Docker images are th
 
 - **Database:** a local PostgreSQL 16 on port 5433, because PostgreSQL 14 already uses 5432.
 - **Redis:** not needed until the caching phase.
-- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. Later phases add `GITHUB_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`.
+- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. It also needs `ANTHROPIC_API_KEY`, `GITHUB_WEBHOOK_SECRET`, `JWT_SECRET` (at least 32 characters), `GITHUB_APP_ID`, `GITHUB_APP_SLUG` and `GITHUB_APP_PRIVATE_KEY` (PKCS#8 PEM), and fails at startup if one is missing.
 - **Example:** `DB_URL=jdbc:postgresql://localhost:5433/devpulse`
 - **Tests:** from Phase 2 onwards, tests use Testcontainers, so Docker Desktop must be running. No project Docker files are involved, and tests don't touch the local database.
 
@@ -72,17 +74,14 @@ Check every diff for:
 
 This project is mentored, and the owner is preparing for interviews.
 
-1. Claude writes all code except the Docker files, one step at a time, and runs the step's gate.
-2. Claude stops and summarizes what changed, the key decisions, and any deviations from the spec.
-3. The owner reviews, and they discuss it. Claude explains anything asked about.
-4. Claude updates `docs/interview-prep.md`, logs any deviations in the spec, and suggests a commit message.
-5. The owner commits. **Claude never runs `git commit` or `git push`.**
-6. Claude starts the next step only when told to.
-
-Each phase ends with a short mock interview.
+1. Before each step, run `git pull` and confirm the working tree is clean.
+2. Each step gets its own branch, created from the previous step's branch until the owner merges to `main`.
+3. Claude writes the code, runs the step's gate, then commits and pushes that branch. Claude does not merge to `main`.
+4. Claude updates `docs/interview-prep.md`, logs deviations in the spec, and adds anything to discuss to `docs/discussion-notes.md`.
+5. The owner reviews afterwards and asks about anything in the notes or code.
 
 **The owner's files:** `Dockerfile`, `docker-compose.yml`, `.env.example`, all planned for Phase 6. Don't edit these unless asked, and don't make earlier phases depend on them.
 
 **The owner works in this repo at the same time.** Re-read any file before overwriting it, and check `git status` before starting a step.
 
-**Not yet in scope:** read API, JWT and auth endpoints, the GitHub callback, caching, frontend. Raise these for discussion rather than building them.
+**Not yet in scope:** read API, caching, frontend, Docker. Raise these for discussion rather than building them.

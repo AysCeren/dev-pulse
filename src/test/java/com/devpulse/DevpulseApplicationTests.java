@@ -1,10 +1,9 @@
 package com.devpulse;
 
+import com.devpulse.support.IntegrationTestBase;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class DevpulseApplicationTests {
+class DevpulseApplicationTests extends IntegrationTestBase {
 
 	@Test
 	void contextLoads() {

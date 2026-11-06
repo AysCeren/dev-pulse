@@ -824,20 +824,314 @@ The running record of where the implementation intentionally differs from this d
 | Packaging | Default jar tasks | Plain jar disabled | `build/libs/*.jar` must match one file for the Dockerfile | Applied |
 | Dockerfile | `-Djarmode=layertools` | `-Djarmode=tools extract --layers`, with matching `COPY` and `ENTRYPOINT` | `layertools` is deprecated | Planned (Phase 6) |
 | Delivery order | Containerized build described from Issue #1 | Runs locally on PostgreSQL 16 throughout development. Docker image and compose setup are the last step | Keeps early phases simple. Testcontainers stays for tests, so Docker Desktop is still needed to run them | Applied |
-| Schema | Enables `uuid-ossp` | Removed | `gen_random_uuid()` is built in since PG13 | Planned (Phase 2) |
-| Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Planned (Phase 2) |
-| Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Planned (Phase 2) |
-| Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Planned (Phase 2) |
-| Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Planned (Phase 2) |
-| Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Planned (Phase 2) |
-| Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Planned (Phase 4) |
-| Triage flow | Saves after the Claude call, in one transaction | Saves `NEW`, dispatches after commit, calls Claude outside any transaction | Avoids holding a connection during the call, and losing events | Planned (Phase 4) |
-| Triage failure | Saves a fabricated `MEDIUM`/`BUG` result as `TRIAGED` | Marks `TRIAGE_FAILED` | Fabricated data looks real | Planned (Phase 4) |
-| Claude client | Hardcoded model, unpooled client | Configurable model, pooled client | The hardcoded model is outdated | Planned (Phase 4) |
-| Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Planned (Phase 5) |
+| Schema | Enables `uuid-ossp` | Removed | `gen_random_uuid()` is built in since PG13 | Applied |
+| Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Applied |
+| Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Applied |
+| Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Applied |
+| Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Applied |
+| Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Applied |
+| Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Applied |
+| Triage flow | Saves after the Claude call, in one transaction | Saves `NEW`, dispatches after commit, calls Claude outside any transaction | Avoids holding a connection during the call, and losing events | Applied |
+| Triage failure | Saves a fabricated `MEDIUM`/`BUG` result as `TRIAGED` | Marks `TRIAGE_FAILED` | Fabricated data looks real | Applied |
+| Claude client | Hardcoded `claude-3-5-sonnet-20241022`, API version `2023-06-01`, unpooled client | Configurable `claude-opus-5-5`, API version `2026-10-21`, pooled JDK client, 60s read timeout | The hardcoded model is outdated, and thinking makes calls slower | Applied |
+| Claude output | JSON requested in the prompt, reads the first content block | Enforced with `output_config.format`, checks `stop_reason`, finds the text block | A prompt can't guarantee JSON, and thinking blocks can come first | Applied |
+| Prompt safety | Issue text sent as plain prompt | Issue text marked as untrusted, and output validated against enums | Anyone can write an issue, so it can contain prompt injection | Applied |
+| Refusals | Not handled | `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta header | A safety classifier decline is retried on another model | Applied |
+| Auth endpoints | Native JWT and BCrypt described, with no endpoints specified | `POST /api/v1/auth/register` and `/login`. 12-72 character passwords, emails stored lowercase, 1-hour tokens | The spec needs these but doesn't define them | Applied |
+| GitHub callback | Reads the caller's JWT from the request | A signed, 15-minute `state` from `GET /api/v1/github/install-url` identifies the user, and the installation is verified with GitHub's API | A browser redirect from GitHub carries no `Authorization` header | Applied |
+| Installation claims | Not specified | Rejects an installation linked to another user (409), and first-time claims older than 1 hour (409) | `installation_id` in the callback URL can be edited by the user | Applied |
+| Callback results | Redirects to "the onboarding view" | Redirects to `github.app.onboarding-url` with `?installation=success`, `cancelled` or `pending` | No frontend exists yet, so the URL is configurable | Applied |
+| Cache eviction | `@CacheEvict` on the orchestrator | Not built, and Redis isn't used yet | Nothing is cached, because no read API exists | Deferred |
+| Webhook security | No filter chain defined for this slice | JWT filter chain. Public: webhook, register, login, callback, `/actuator/health`. Other actuator paths need `ROLE_ADMIN`, other `/api/v1/**` paths need a token, and everything else is denied | The default chain blocks GitHub's `POST`, and the webhook and callback authenticate in other ways | Applied |
 
 ## **Known Gaps**
 
 * Issues left in `NEW` after a crash or full queue are not recovered yet. A recovery job needs locking across instances.
-* The GitHub callback (Issue #4.1) is deferred. A browser redirect carries no JWT, and an unverified `installation_id` could be claimed by another user.
+* An installation can be claimed by a different user within the 1-hour window if they obtain its ID. Closing this fully needs a GitHub user token, which the spec rules out.
+* No read API is defined, so triaged issues can only be read from the database. Caching waits for this.
+* A 429 or 529 from Claude marks an issue `TRIAGE_FAILED` with no retry.
+* The Claude and GitHub integrations have only run against fake servers, not the real APIs.
 * Only the `opened` action is handled, so issue edits and closes are not reflected.
+
+# **Project Roadmap**
+
+Issues #1 to #5 are built, except the Docker part of Issue #1. The issues below are everything still open, in the recommended order. Each one has its own branch, and new behavior comes with tests. Issue numbers follow on from the sections above, and all are **Not started**.
+
+| Stage | Issues | Why this order |
+| :---- | :---- | :---- |
+| **1. Stabilize** | #6 Repository cleanup, #7 CI, #8 Real integration testing | Proves what exists works against the real APIs before more is built on it |
+| **2. Make it reliable and usable** | #9 Triage reliability, #10 Read API, #11 Security hardening | Fixes known failure modes, and makes the triaged data available |
+| **3. Optimize and extend** | #12 Caching, #13 Issue lifecycle, #14 Triage quality and cost | Each depends on stage 2, or on real usage data |
+| **4. Run it with confidence** | #15 Observability, #16 Testing depth, #17 API documentation, #18 Data lifecycle | Makes the system measurable, verifiable and safe to hold real data |
+| **5. Ship it** | #19 Frontend, #20 Docker, #21 Deployment, #22 Portfolio and interview prep | Docker stays the last build step, as agreed |
+
+# **Issue \#6: Repository Cleanup**
+
+**Goal:** a clean baseline on `main`.
+
+- [ ] Merge the stacked feature branches into `main`, oldest first.
+- [ ] Decide whether to remove `plugin/`, `include("plugin")` and the `junit-jupiter` catalog entry.
+- [ ] Fix the broken Markdown in the spec's `TriageMetadata` section.
+- [ ] Move `SupportSignatures` to the `support` test package, and give it a clearer name.
+- [ ] Add a `README.md` covering the architecture, setup, and how to run and test.
+- [ ] Protect `main`, so changes arrive through reviewed pull requests.
+
+**Done when:** `main` holds all the work, and `./gradlew clean build` passes from a fresh clone.
+
+# **Issue \#7: Continuous Integration**
+
+**Goal:** every change is tested automatically.
+
+- [ ] Add a GitHub Actions workflow that runs `./gradlew build` on pushes and pull requests.
+- [ ] Cache Gradle dependencies, and publish test reports when a run fails.
+- [ ] Add dependency vulnerability scanning and automated update pull requests.
+- [ ] Add secret scanning.
+- [ ] Add a coverage report, and decide on a minimum threshold.
+
+**Done when:** a failing test blocks a pull request from merging.
+
+# **Issue \#8: Real Integration Testing**
+
+**Goal:** replace assumptions with evidence. So far, Claude and GitHub have only been faked.
+
+- [ ] Install PostgreSQL 16 locally, and run the app against it.
+- [ ] Register a GitHub App with its Setup URL, the Issues and Installation events, and a converted PKCS#8 key.
+- [ ] Set up a tunnel such as smee.io, and an Anthropic API key.
+- [ ] Run the full flow: register, install the app, open a real issue, and confirm it reaches `TRIAGED`.
+- [ ] Confirm the live request shape, including `output_config.format`, `fallbacks` and the beta header.
+- [ ] Test uninstalling, and redelivering from GitHub's delivery page.
+- [ ] Replace the hand-written fixtures with captured real payloads, with sensitive values removed.
+
+**Done when:** a real GitHub issue is triaged by the real Claude API, and anything found is fixed.
+
+# **Issue \#9: Triage Reliability**
+
+**Goal:** no issue gets stuck or fails permanently because of a temporary problem.
+
+- [ ] Retry 429, 5xx and 529 responses with exponential backoff and jitter, honoring `retry-after`.
+- [ ] Add a migration for attempt tracking (attempt count, last error, last attempt time).
+- [ ] Add a recovery job for stuck `NEW` issues and retryable `TRIAGE_FAILED` issues, using `FOR UPDATE SKIP LOCKED` or ShedLock so that several instances are safe.
+- [ ] Set a maximum number of attempts, so a permanent failure stops consuming API calls.
+- [ ] Add a way to retry a failed issue manually.
+- [ ] Handle unexpected worker exceptions, which currently leave an issue in `NEW`.
+- [ ] Make `recordSuccess` safe when two workers finish the same issue.
+- [ ] Decide how to handle very large issue bodies. They must not be silently truncated.
+- [ ] Decide what happens when the database is down during a webhook. GitHub doesn't retry failed deliveries automatically, so consider a job that redelivers them through GitHub's API.
+- [ ] Decide whether a circuit breaker is justified during long Claude outages.
+
+**Done when:** tests show that issues recover after a Claude outage, a full queue, and an app restart.
+
+# **Issue \#10: Read API**
+
+**Goal:** make triaged issues queryable, which is the spec's stated mission and isn't met yet.
+
+- [ ] Define the API contract first, along with its response DTOs.
+- [ ] `GET /api/v1/issues`: paginated, sorted, and filtered by status, severity, type and repository.
+- [ ] `GET /api/v1/issues/{id}`.
+- [ ] `GET /api/v1/github/installations`.
+- [ ] Scope every query to the authenticated user's installations. Another tenant's issue must return 404, not 403.
+- [ ] Add a query-count test for each endpoint, and review indexes against the real filters.
+- [ ] Limit the maximum page size.
+- [ ] Decide what `ROLE_ADMIN` can see.
+- [ ] Decide how teams share access. An installation has a single owner today, so organization members can't see its issues.
+
+**Done when:** a user can read and filter their own issues, and tests prove they can't reach anyone else's.
+
+# **Issue \#11: Security Hardening**
+
+**Goal:** close the known gaps before real users arrive.
+
+**Authentication**
+- [ ] Rate limit login and registration, and add account lockout or backoff.
+- [ ] Add refresh tokens and token revocation.
+- [ ] Add email verification and password reset.
+- [ ] Enforce BCrypt's 72-**byte** limit, since the current check counts characters.
+- [ ] Decide how to prevent registration from revealing which emails exist.
+- [ ] Add a safe way to create the first admin, and to change roles.
+
+**API and webhooks**
+- [ ] Set a maximum request body size.
+- [ ] Decide whether to reject replayed `X-GitHub-Delivery` IDs.
+- [ ] Configure CORS once the frontend's origin is known.
+- [ ] Review security headers, and enforce TLS in deployed environments.
+- [ ] Give Prometheus scraping a suitable credential, because `/actuator/prometheus` requires `ROLE_ADMIN` today.
+
+**Secrets and keys**
+- [ ] Plan rotation for the JWT key, webhook secret and GitHub App key. The JWT `kid` header supports this.
+- [ ] Decide whether to accept the remaining 1-hour installation claim risk, or require GitHub user authorization.
+
+**Review**
+- [ ] Write a threat model.
+- [ ] Add an audit log for logins, role changes, and installation links.
+- [ ] Test prompt injection with hostile issue text.
+- [ ] Run an OWASP Top 10 review of the API.
+
+**Done when:** the threat model has an owner and a decision for every risk, and each fix has a test.
+
+# **Issue \#12: Caching**
+
+**Goal:** make frequent reads faster, as the mission promises, without serving stale or cross-tenant data. Depends on Issue #10.
+
+- [ ] Measure read performance first, so the cache is justified and the spec's "sub-millisecond" claim gets tested.
+- [ ] Decide what to cache, with each entry's TTL.
+- [ ] Include the user or tenant in every cache key.
+- [ ] Cache DTOs, not entities, and choose a serializer that works with Jackson 3.
+- [ ] Evict **after commit**, for example with `@TransactionalEventListener`. The spec's `@CacheEvict` on an async transactional method can evict too early, and a read can then cache stale data again.
+- [ ] Evict per tenant, not with the spec's `allEntries = true`, which clears every tenant's data on each new issue.
+- [ ] Evict when an installation is uninstalled.
+- [ ] Keep serving reads from PostgreSQL if Redis is down.
+- [ ] Re-enable the Redis health check, and decide whether Redis being down should mark the app unhealthy.
+- [ ] Add a Redis Testcontainer, and tests for hits, eviction and tenant isolation.
+- [ ] Track the hit rate.
+
+**Done when:** measurements show a real improvement, and tests prove there's no stale or cross-tenant data.
+
+# **Issue \#13: Issue Lifecycle**
+
+**Goal:** keep stored data in step with GitHub. Only `issues.opened` and `installation.deleted` are handled today.
+
+- [ ] Handle `issues` actions: `edited`, `closed`, `reopened`, `deleted`, `transferred`.
+- [ ] Decide when an edit should trigger another triage, given the cost.
+- [ ] Handle events arriving out of order.
+- [ ] Handle `installation` actions: `suspend`, `unsuspend`.
+- [ ] Handle `installation_repositories`, and repository renames.
+- [ ] Decide whether to import issues that existed before installation.
+- [ ] Decide whether to write labels back to GitHub. This needs installation access tokens and write permission. Because issue text can steer the model, it should require human approval first.
+- [ ] Decide whether to send notifications, such as for `CRITICAL` issues.
+
+**Done when:** closing or editing an issue on GitHub is reflected in DevPulse.
+
+# **Issue \#14: Triage Quality and Cost**
+
+**Goal:** know how good the classifications are, and what they cost.
+
+- [ ] Build a labeled evaluation set of real issues.
+- [ ] Compare `claude-opus-5-5` and `claude-haiku-5-5` on accuracy and cost, then choose a default.
+- [ ] Tune `effort` and `max-tokens` using those results.
+- [ ] Store the model used on each triage result, so results stay comparable after a change.
+- [ ] Record token usage and cost per issue, and set a budget alert.
+- [ ] Decide between `RestClient` and Anthropic's official Java SDK, which provides typed errors and retries.
+- [ ] Consider the Batch API for backlogs, and prompt caching if the prompt grows.
+- [ ] Let users correct a classification, and feed corrections into the evaluation set.
+
+**Done when:** the model choice is backed by measured accuracy and cost.
+
+# **Issue \#15: Observability**
+
+**Goal:** detect and diagnose problems without reading the database.
+
+- [ ] Add metrics: webhooks by event and result, triage duration and outcome, queue depth and rejections, Claude errors by status, and issues stuck in `NEW`.
+- [ ] Use structured JSON logs in deployed environments.
+- [ ] Carry the delivery ID and issue ID through async work with MDC.
+- [ ] Add distributed tracing across the webhook, worker and outbound calls.
+- [ ] Separate liveness from readiness, including database checks.
+- [ ] Build a dashboard and alerts for failure rate, queue saturation and connection pool exhaustion.
+- [ ] Confirm that logs contain no secrets or issue bodies.
+
+**Done when:** an engineer can trace a single delivery from receipt to triage result, and an alert fires on failure.
+
+# **Issue \#16: Testing Depth**
+
+**Goal:** cover what the current 72 tests don't. Each issue above adds its own tests, and this covers the cross-cutting gaps.
+
+- [ ] **Concurrency:** test the real races, which are currently untested: two simultaneous deliveries, registrations and installation claims.
+- [ ] **Load:** measure the spec's sub-second acknowledgment under load with k6 or Gatling, and find the point where the queue and connection pool saturate.
+- [ ] **Failure:** test with the database, Redis and Claude down, slow, or restarting.
+- [ ] **Architecture:** use ArchUnit to enforce rules, such as controllers not using repositories and packages not forming cycles.
+- [ ] **Coverage:** add JaCoCo reports, and consider mutation testing on the security code.
+- [ ] **Security:** add scanning such as OWASP ZAP against a running instance.
+- [ ] **Contract:** add a scheduled, low-cost run against the real APIs to catch changes the fakes can't.
+- [ ] **Migrations:** test each migration against a database containing data.
+- [ ] **Speed:** reduce the number of separate Spring contexts and containers as the suite grows.
+
+**Done when:** the spec's performance guarantees have measured numbers, and every race has a test.
+
+# **Issue \#17: API Documentation**
+
+**Goal:** make the API usable without reading the code.
+
+- [ ] Publish an OpenAPI description, with Swagger UI restricted outside development.
+- [ ] Document the error format, status codes, authentication and pagination.
+- [ ] Decide on a versioning and deprecation policy for `/api/v1`.
+- [ ] Check the OpenAPI description in CI, so it can't drift from the code.
+
+**Done when:** a frontend developer can integrate using only the published documentation.
+
+# **Issue \#18: Data Lifecycle and Privacy**
+
+**Goal:** handle stored data responsibly.
+
+- [ ] Set retention periods for issues, `raw_ai_response`, and uninstalled tenants' data. Soft-deleted installations are currently kept forever.
+- [ ] Add account deletion and data export.
+- [ ] Document the personal data held, such as emails, GitHub usernames, and avatars.
+- [ ] Tell users that issue text, including from private repositories, is sent to Anthropic, and check that this is acceptable.
+- [ ] Set up backups, and test a restore.
+- [ ] Define a zero-downtime migration policy.
+
+**Done when:** retention rules are automated, and a restore has been tested.
+
+# **Issue \#19: Frontend**
+
+**Goal:** give users an interface. Depends on Issues #10 and #17.
+
+- [ ] Choose a stack, and how to store tokens safely in the browser.
+- [ ] Build registration, login, and the GitHub onboarding page behind `github.app.onboarding-url`.
+- [ ] Show friendly callback errors, which are raw JSON today.
+- [ ] Build the issue list with filters, the issue detail page, and the installation list.
+- [ ] Configure CORS with Issue #11, and add end-to-end browser tests.
+
+**Done when:** a new user can sign up, install the app, and see a triaged issue without using the API directly.
+
+# **Issue \#20: Docker**
+
+**Goal:** package the app, completing Issue #1. This is the owner's work and the last build step.
+
+- [ ] Write the `Dockerfile` using `-Djarmode=tools extract --layers`, with matching `COPY` and `ENTRYPOINT` lines.
+- [ ] Run as a non-root user, and check memory settings and image scanning.
+- [ ] Write `docker-compose.yml` with the app, PostgreSQL 16 and Redis.
+- [ ] Add healthchecks and startup ordering. `/actuator/health` is public and shows status only.
+- [ ] Write `.env.example` with every required variable and no real values.
+- [ ] Add a `.dockerignore`.
+- [ ] Build the image in CI.
+
+**Done when:** `docker compose up` runs the whole system from a fresh clone.
+
+# **Issue \#21: Deployment**
+
+**Goal:** run DevPulse somewhere real. Depends on Issue #20.
+
+- [ ] Choose a hosting platform and environments, such as staging and production.
+- [ ] Add automated deployment from CI, with a rollback plan.
+- [ ] Store secrets in a secrets manager, and use managed PostgreSQL and Redis.
+- [ ] Configure TLS and a stable webhook URL.
+- [ ] Size the connection pool and thread pool together, based on Issue #16's load results.
+- [ ] Test graceful shutdown, since queued tasks live in memory.
+- [ ] Decide whether virtual threads help, now that Java 21 makes them available.
+- [ ] Decide whether to move queued work to a durable broker such as SQS or Kafka, based on measured need.
+- [ ] Write runbooks for common failures.
+
+**Done when:** a change reaches production through the pipeline, and can be rolled back.
+
+# **Issue \#22: Portfolio and Interview Prep**
+
+**Goal:** be able to present and defend this project.
+
+- [ ] Go through the mock interview questions in `docs/interview-prep.md` together.
+- [ ] Write architecture decision records for the main choices.
+- [ ] Add a system diagram that matches what was actually built. The one at the top of this spec differs.
+- [ ] Prepare a short demo and a two-minute project summary.
+- [ ] Be ready to explain the spec problems found, and the trade-offs and remaining risks.
+
+**Done when:** you can explain any part of the system and defend its trade-offs without notes.
+
+## **Decisions Needed From the Owner**
+
+| Decision | Issue | Needed before |
+| :---- | :---- | :---- |
+| Remove `plugin/`? | #6 | Cleanup |
+| Which model should be the default? | #14 | Production, after evaluation |
+| Accept the installation claim risk, or require GitHub user authorization? | #11 | Real users |
+| How should organization teams share access? | #10 | Read API |
+| Should labels be written back to GitHub? | #13 | Issue lifecycle |
+| `RestClient` or Anthropic's SDK? | #14 | Before adding retries in #9, since the SDK includes them |
+| Where should it be hosted? | #21 | Deployment |
