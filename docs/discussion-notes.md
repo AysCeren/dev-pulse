@@ -20,3 +20,10 @@ Decisions made while building without stopping for review. Each one is open to c
 - **Fallbacks are on:** the request sends `fallbacks: "default"` and a beta header, so a safety decline gets retried on another model. Billing can differ when that happens. Remove it if you don't want a beta feature.
 - **No retries yet:** a 429 or 529 marks the issue `TRIAGE_FAILED` straight away, even though both are retryable. A burst of issues could fail unnecessarily. I'd add retries alongside the recovery job.
 - **Never tested against the real API:** all tests use a fake server, because I have no API key to use here. The first real call is part of the manual end-to-end test.
+
+## Authentication
+
+- **JJWT with Jackson 3:** resolved. `jjwt-jackson` uses its own Jackson 2 internally, and tokens work in the tests.
+- **Missing protections:** no rate limiting or lockout on login, no email verification, no refresh tokens or revocation. All are worth adding before real users, and rate limiting comes first.
+- **Admin users:** there's no way to create a `ROLE_ADMIN` user except updating the database by hand, and `/actuator/prometheus` needs that role. A monitoring system would need its own access.
+- **Password length:** the 72 limit counts characters, while BCrypt's limit is in bytes. A long password with multi-byte characters gets cut off silently.

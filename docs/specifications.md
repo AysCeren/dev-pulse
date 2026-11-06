@@ -837,6 +837,7 @@ The running record of where the implementation intentionally differs from this d
 | Claude output | JSON requested in the prompt, reads the first content block | Enforced with `output_config.format`, checks `stop_reason`, finds the text block | A prompt can't guarantee JSON, and thinking blocks can come first | Applied |
 | Prompt safety | Issue text sent as plain prompt | Issue text marked as untrusted, and output validated against enums | Anyone can write an issue, so it can contain prompt injection | Applied |
 | Refusals | Not handled | `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta header | A safety classifier decline is retried on another model | Applied |
+| Auth endpoints | Native JWT and BCrypt described, with no endpoints specified | `POST /api/v1/auth/register` and `/login`. 12-72 character passwords, emails stored lowercase, 1-hour tokens | The spec needs these but doesn't define them | Applied |
 | Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Applied |
 
 ## **Known Gaps**

@@ -28,7 +28,7 @@ Everything runs directly on the machine during development. Docker images are th
 
 - **Database:** a local PostgreSQL 16 on port 5433, because PostgreSQL 14 already uses 5432.
 - **Redis:** not needed until the caching phase.
-- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. Later phases add `GITHUB_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`.
+- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. It also needs `ANTHROPIC_API_KEY`, `GITHUB_WEBHOOK_SECRET` and `JWT_SECRET` (at least 32 characters), and fails at startup if any is missing.
 - **Example:** `DB_URL=jdbc:postgresql://localhost:5433/devpulse`
 - **Tests:** from Phase 2 onwards, tests use Testcontainers, so Docker Desktop must be running. No project Docker files are involved, and tests don't touch the local database.
 
@@ -83,4 +83,4 @@ This project is mentored, and the owner is preparing for interviews.
 
 **The owner works in this repo at the same time.** Re-read any file before overwriting it, and check `git status` before starting a step.
 
-**Not yet in scope:** read API, JWT and auth endpoints, the GitHub callback, caching, frontend. Raise these for discussion rather than building them.
+**Not yet in scope:** read API, caching, frontend, Docker. Raise these for discussion rather than building them.

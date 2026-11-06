@@ -139,9 +139,10 @@ class GitHubWebhookControllerTest extends IntegrationTestBase {
 	}
 
 	@Test
-	void everythingElseIsDenied() throws Exception {
-		mockMvc.perform(get("/actuator/prometheus")).andExpect(status().isForbidden());
-		mockMvc.perform(get("/api/v1/anything")).andExpect(status().isForbidden());
+	void everythingElseNeedsAuthentication() throws Exception {
+		mockMvc.perform(get("/actuator/prometheus")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/api/v1/anything")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/not-an-api-path")).andExpect(status().isUnauthorized());
 	}
 
 	private ResultActions deliver(String event, byte[] body) throws Exception {
