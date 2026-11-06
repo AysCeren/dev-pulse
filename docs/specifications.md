@@ -812,3 +812,31 @@ Before accepting changes, perform rigorous `git diff` audits targeting critical 
 * **N+1 Query Detection:** Verify JPA relationship fetch strategies; enforce explicit JOIN FETCH or batch fetching on entity relationships like `Issue` and `TriageMetadata`.  
 * **Timing Attack Audits:** Ensure all signature verifications use `MessageDigest.isEqual` and that no short-circuit string comparisons (`equals`) are introduced into authentication pathways.  
 * **Schema & Entity Alignment:** Confirm zero divergence between Flyway SQL migrations and Hibernate entity mapping annotations (such as column constraints, UUID generators, and JSONB type converters).
+
+# **Deviations from Spec**
+
+The running record of where the implementation intentionally differs from this document. Where this section and the text above disagree, this section wins.
+
+| Area | Spec says | Implementation | Why | Status |
+| :---- | :---- | :---- | :---- | :---- |
+| Framework | Spring Boot 3.3+, Hibernate 6, Security 6 | Spring Boot 4.1.2, Hibernate 7, Security 7 | New project, so start on the current line. Jackson 3 changes the `ObjectMapper` package to `tools.jackson.databind` | Applied |
+| Build tool | Gradle 8.x | Gradle 9.8.2 | Matches the generated wrapper | Applied |
+| Packaging | Default jar tasks | Plain jar disabled | `build/libs/*.jar` must match one file for the Dockerfile | Applied |
+| Dockerfile | `-Djarmode=layertools` | `-Djarmode=tools extract --layers`, with matching `COPY` and `ENTRYPOINT` | `layertools` is deprecated | Planned (owner's Docker work) |
+| Schema | Enables `uuid-ossp` | Removed | `gen_random_uuid()` is built in since PG13 | Planned (Phase 2) |
+| Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Planned (Phase 2) |
+| Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Planned (Phase 2) |
+| Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Planned (Phase 2) |
+| Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Planned (Phase 2) |
+| Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Planned (Phase 2) |
+| Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Planned (Phase 4) |
+| Triage flow | Saves after the Claude call, in one transaction | Saves `NEW`, dispatches after commit, calls Claude outside any transaction | Avoids holding a connection during the call, and losing events | Planned (Phase 4) |
+| Triage failure | Saves a fabricated `MEDIUM`/`BUG` result as `TRIAGED` | Marks `TRIAGE_FAILED` | Fabricated data looks real | Planned (Phase 4) |
+| Claude client | Hardcoded model, unpooled client | Configurable model, pooled client | The hardcoded model is outdated | Planned (Phase 4) |
+| Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Planned (Phase 5) |
+
+## **Known Gaps**
+
+* Issues left in `NEW` after a crash or full queue are not recovered yet. A recovery job needs locking across instances.
+* The GitHub callback (Issue #4.1) is deferred. A browser redirect carries no JWT, and an unverified `installation_id` could be claimed by another user.
+* Only the `opened` action is handled, so issue edits and closes are not reflected.
