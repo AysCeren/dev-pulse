@@ -21,9 +21,15 @@ Boot 4 specifics that differ from the spec's snippets:
 ./gradlew :test            # known failure until Phase 2.1: no test datasource yet
 ```
 
-From Phase 2 onwards, tests need Docker running for Testcontainers.
+## Local development
 
-Running the app needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`. Later phases add `GITHUB_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`.
+Everything runs directly on the machine during development. Docker images are the last step (Phase 6).
+
+- **Database:** a local PostgreSQL 16 on port 5433, because PostgreSQL 14 already uses 5432.
+- **Redis:** not needed until the caching phase.
+- **Running the app:** `./gradlew :bootRun` needs `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` set in the shell or IDE run configuration. Spring does not load `.env` by itself. Later phases add `GITHUB_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`.
+- **Example:** `DB_URL=jdbc:postgresql://localhost:5433/devpulse`
+- **Tests:** from Phase 2 onwards, tests use Testcontainers, so Docker Desktop must be running. No project Docker files are involved, and tests don't touch the local database.
 
 ## Project layout
 
@@ -75,7 +81,7 @@ This project is mentored, and the owner is preparing for interviews.
 
 Each phase ends with a short mock interview.
 
-**The owner's files:** `Dockerfile`, `docker-compose.yml`, `.env.example`. Don't edit these unless asked.
+**The owner's files:** `Dockerfile`, `docker-compose.yml`, `.env.example`, all planned for Phase 6. Don't edit these unless asked, and don't make earlier phases depend on them.
 
 **The owner works in this repo at the same time.** Re-read any file before overwriting it, and check `git status` before starting a step.
 
