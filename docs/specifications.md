@@ -824,10 +824,10 @@ The running record of where the implementation intentionally differs from this d
 | Packaging | Default jar tasks | Plain jar disabled | `build/libs/*.jar` must match one file for the Dockerfile | Applied |
 | Dockerfile | `-Djarmode=layertools` | `-Djarmode=tools extract --layers`, with matching `COPY` and `ENTRYPOINT` | `layertools` is deprecated | Planned (Phase 6) |
 | Delivery order | Containerized build described from Issue #1 | Runs locally on PostgreSQL 16 throughout development. Docker image and compose setup are the last step | Keeps early phases simple. Testcontainers stays for tests, so Docker Desktop is still needed to run them | Applied |
-| Schema | Enables `uuid-ossp` | Removed | `gen_random_uuid()` is built in since PG13 | Planned (Phase 2) |
-| Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Planned (Phase 2) |
-| Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Planned (Phase 2) |
-| Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Planned (Phase 2) |
+| Schema | Enables `uuid-ossp` | Removed | `gen_random_uuid()` is built in since PG13 | Applied |
+| Schema | `issues` has no tenant link | `issues.installation_id` NOT NULL FK, plus index on `(installation_id, created_at DESC)` | Tenant isolation is otherwise impossible | Applied |
+| Schema | Non-unique index on `external_id` | `UNIQUE (source, external_id)` | GitHub redelivers webhooks, which would create duplicates | Applied |
+| Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Applied |
 | Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Planned (Phase 2) |
 | Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Planned (Phase 2) |
 | Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Planned (Phase 4) |

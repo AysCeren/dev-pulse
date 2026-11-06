@@ -19,7 +19,7 @@ Boot 4 specifics that differ from the spec's snippets:
 
 ```bash
 ./gradlew clean :bootJar   # builds exactly one jar in build/libs/
-./gradlew :test            # known failure until Phase 2.1: no test datasource yet
+./gradlew :test            # needs Docker running (Testcontainers)
 ```
 
 ## Local development
