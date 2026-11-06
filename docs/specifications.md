@@ -830,14 +830,14 @@ The running record of where the implementation intentionally differs from this d
 | Schema | Uninstall "cascades or deactivates" | `github_installations.uninstalled_at` | Deactivating keeps issue history | Applied |
 | Entities | `issueType` as `String`, `suggestedLabels` as nullable `String` | `IssueType` enum, non-null `List<String>` | Matches the schema and the triage contract | Applied |
 | Status | Enum values undefined | `NEW`, `TRIAGED`, `TRIAGE_FAILED` | Failures must be visible | Applied |
-| Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Planned (Phase 4) |
+| Signature | Verified over a `String` body | Verified over raw `byte[]` | Converting to `String` can alter bytes | Applied |
 | Triage flow | Saves after the Claude call, in one transaction | Saves `NEW`, dispatches after commit, calls Claude outside any transaction | Avoids holding a connection during the call, and losing events | Applied |
 | Triage failure | Saves a fabricated `MEDIUM`/`BUG` result as `TRIAGED` | Marks `TRIAGE_FAILED` | Fabricated data looks real | Applied |
 | Claude client | Hardcoded `claude-3-5-sonnet-20241022`, API version `2023-06-01`, unpooled client | Configurable `claude-opus-5-5`, API version `2026-10-21`, pooled JDK client, 60s read timeout | The hardcoded model is outdated, and thinking makes calls slower | Applied |
 | Claude output | JSON requested in the prompt, reads the first content block | Enforced with `output_config.format`, checks `stop_reason`, finds the text block | A prompt can't guarantee JSON, and thinking blocks can come first | Applied |
 | Prompt safety | Issue text sent as plain prompt | Issue text marked as untrusted, and output validated against enums | Anyone can write an issue, so it can contain prompt injection | Applied |
 | Refusals | Not handled | `fallbacks: "default"` with the `server-side-fallback-2026-07-01` beta header | A safety classifier decline is retried on another model | Applied |
-| Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Planned (Phase 5) |
+| Webhook security | No filter chain defined for this slice | Minimal chain: webhook path and `/actuator/health` public, all else denied | The default chain blocks GitHub's `POST`. JWT comes later | Applied |
 
 ## **Known Gaps**
 
